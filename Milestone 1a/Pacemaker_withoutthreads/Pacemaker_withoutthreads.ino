@@ -51,7 +51,7 @@ void loop() {
       string amplitudeValue = signal.c_str(); 
 
       // Checking which wave we got
-      if(stod(amplitudeValue) == P_AMP  && lastWave == 'T'){
+      if(stod(amplitudeValue) == P_AMP  && (lastWave == 'T'|| lastWave == 'R')){
         beatStartTime = currentTime;
         lastWave='P';
       }

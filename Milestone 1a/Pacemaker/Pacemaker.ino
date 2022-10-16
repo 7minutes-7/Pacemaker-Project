@@ -111,7 +111,7 @@ void TaskReadHeart(void* pvParameters){
         double amplitudeValue = stod(signal.c_str()); 
 
         // Checking which wave we got
-        if(amplitudeValue == P_AMP  && lastWave == 'T'){
+        if(amplitudeValue == P_AMP  && (lastWave == 'T' || lastWave == 'R')){
           beatStartTime = currentTime;
           lastWave='P';
         }
