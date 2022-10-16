@@ -6,7 +6,6 @@ using namespace std;
 //**************************************************************************
 // global variables for pacemaker operation
 //**************************************************************************  
-int lastPaceValue = 0;
 int currentPaceValue = 0;
 
 //**************************************************************************
@@ -90,6 +89,8 @@ void TaskReadHeart(void* pvParameters){
 
   char lastWave='T';
   double beatStartTime;
+
+  bool isNatural = true;
   
   while(true){
     unsigned long currentTime = millis(); //time in milliseconds
@@ -97,9 +98,12 @@ void TaskReadHeart(void* pvParameters){
   
     // No R wave was detected until upper bound
     if(currentTime - lastRTime >= upperBound && lastWave == 'T'){
-        currentPaceValue = 1;
+      currentPaceValue = 1;
+      isNatural = false;  // this is not a natural wave!!
     } 
-    else currentPaceValue = 0;
+    else {
+      currentPaceValue = 0;
+    }
 
     // detect wave signal from heart
     if(Serial1.available()>0){  // if there is any byte available to be read on UART1 buffer
@@ -135,7 +139,16 @@ void TaskReadHeart(void* pvParameters){
           }
           
           // if natural R-wave is detected : enable hysteresis pacing
-          lastPaceValue == 0 ? upperBound = 1000*60/HRL : 1000*60/LRL;
+          if(isNatural){
+            Serial.println("natural r-wave detected");
+            upperBound = 1000*60/HRL;
+          }
+          else{
+            Serial.println("paced r-wave detected");
+            upperBound = 1000*60/LRL;
+            isNatural = true;
+          }
+
           lastWave='R';
           lastRTime = currentTime;
         }
@@ -160,8 +173,6 @@ void TaskSendPace(void* pvParameters){
     Serial1.println(currentPaceValue);
     Serial.print("pace sent: ");
     Serial.println(currentPaceValue);
-    
-    lastPaceValue = currentPaceValue;   
   }
 }
 

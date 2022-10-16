@@ -5,7 +5,6 @@ using namespace std;
 //**************************************************************************
 // global variables for pacemaker operation
 //**************************************************************************
-int lastPaceValue = 0;
 int currentPaceValue = 0;
 
 const double lowerBound = 1000*60/URL;
@@ -34,11 +33,16 @@ void loop() {
   unsigned long currentTime = millis(); //time in milliseconds
   static unsigned long lastRTime = currentTime;
   static unsigned long lastPaceTime = 0;
+  static bool isNatural = true;
   currentPaceValue = 0;
 
   // No R wave was detected until upper bound
-  if(currentTime - lastRTime >= upperBound){
+  if(currentTime - lastRTime >= upperBound && lastWave == 'T'){
     currentPaceValue = 1;
+    isNatural = false;  // this is not a natural wave!!
+  } 
+  else {
+    currentPaceValue = 0;
   }
 
   // detect wave signal from heart
@@ -72,9 +76,18 @@ void loop() {
           Serial.println("R wave detected before lower bound");
           Serial.println(1);
         }
-        
+
         // if natural R-wave is detected : enable hysteresis pacing
-        lastPaceValue == 0 ? upperBound = 1000*60/HRL : 1000*60/LRL;
+        if(isNatural){
+          Serial.println("natural r-wave detected");
+          upperBound = 1000*60/HRL;
+        }
+        else{
+          Serial.println("paced r-wave detected");
+          upperBound = 1000*60/LRL;
+          isNatural = true;
+        }
+        
         lastWave='R';
         lastRTime = currentTime;
       }
@@ -94,8 +107,6 @@ void loop() {
     Serial.println(currentPaceValue);
     
     lastPaceTime = currentTime;
-    lastPaceValue = currentPaceValue;
-
   }
 }
 
