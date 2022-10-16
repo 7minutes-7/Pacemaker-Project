@@ -61,14 +61,16 @@ void loop() {
       // Detecting R wave
       else if(stod(amplitudeValue) == R_AMP){
         // anomalous R wave after PQRST
-        if(currentTime - beatStartTime <= 1/REFRACTORY_PERIOD){ 
+        if(currentTime - beatStartTime <= 1000.0/REFRACTORY_PERIOD){ 
           Serial.println("ignoring anomalous R Wave");
+          Serial.println(1);
           return; //ignore
         }
         // detected before lower
         if(currentTime - lastRTime <= lowerBound){
           // measure R-R interval from new wave and maintain pace=0
           Serial.println("R wave detected before lower bound");
+          Serial.println(1);
         }
         
         // if natural R-wave is detected : enable hysteresis pacing

@@ -12,4 +12,4 @@
 #define LRL 50
 #define HRL 40
 
-#define REFRACTORY_PERIOD 0.5
+#define REFRACTORY_PERIOD 0.6

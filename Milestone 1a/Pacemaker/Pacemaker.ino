@@ -85,8 +85,6 @@ void loop() {
 // implement tasks
 //**************************************************************************
 void TaskReadHeart(void* pvParameters){
-  Serial.println("Thread TaskReadHeart: Started");
-
   const double lowerBound = 1000.0*60/URL;
   double upperBound = 1000.0*60/LRL;
 
@@ -123,11 +121,12 @@ void TaskReadHeart(void* pvParameters){
         // Detecting R wave
         else if(amplitudeValue == R_AMP){
           // anomalous R wave after PQRST
-          if(currentTime - beatStartTime <= 1/REFRACTORY_PERIOD && lastWave == 'T'){ 
+          if(currentTime - beatStartTime <= 1000.0 * REFRACTORY_PERIOD && lastWave == 'T'){ 
             Serial.print("ignoring anomalous R Wave: ");
             Serial.println(1);
             continue; //ignore
           }
+          
           // detected before lower
           if(currentTime - lastRTime <= lowerBound && lastWave == 'Q'){
             // measure R-R interval from new wave and maintain pace=0
