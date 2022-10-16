@@ -2,46 +2,31 @@
 #include "pacemaker.h"
 using namespace std;
 
+//**************************************************************************
+// global variables for pacemaker operation
+//**************************************************************************
 int lastPaceValue = 0;
 int currentPaceValue = 0;
 
 const double lowerBound = 1000*60/URL;
 double upperBound = 1000*60/LRL;
+long interval = 1000.0 / PACE_FREQUENCY;
   
 char lastWave='T';
 double beatStartTime;
-
-void TaskReadHeart();
-void TaskSendPace();
-
-long interval = 1000.0 / PACE_FREQUENCY;
-
-
 double lastPaceTime = 0;
 
+//*****************************************************************
+
 void setup() {
-  /*
-  xTaskCreate(
-    TaskReadHeart, //task pointer
-    "readheart",  //task name-for humans
-    128, //stack size
-    NULL, //parameter   
-    2, //priority
-    NULL //task handle
-  )
-
-  xTaskCreate(
-    TaskSendPace, //task pointer
-    "sendpace",  //task name-for humans
-    128, //stack size
-    NULL, //parameter   
-    1, //priority
-    NULL //task handle
-  )  
-*/
-
   Serial.begin(9600);
   Serial1.begin(9600);  // initialize UART with baud rate of 9600
+  delay(1000); // prevents usb driver crash on startup, do not omit this
+  
+  // wait for serial port to connect
+  while(!Serial){}
+  while(!Serial1){}
+
 }
 
 
