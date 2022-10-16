@@ -1,9 +1,13 @@
 #include <FreeRTOS_SAMD21.h>
-#include <time.h>
 #include <string>
 #include "pacemaker.h"
-
 using namespace std;
+
+//**************************************************************************
+// global variables for pacemaker operation
+//**************************************************************************  
+int lastPaceValue = 0;
+int currentPaceValue = 0;
 
 //**************************************************************************
 // global variables for RTOS
@@ -15,106 +19,13 @@ void TaskReadHeart(void*);
 void TaskSendPace(void*);
 
 //**************************************************************************
-// global variables for pacemaker operation
-//**************************************************************************
-int lastPaceValue = 0;
-int currentPaceValue = 0;
-
-
-//**************************************************************************
 // Can use these function for RTOS delays
 // Takes into account processor speed
 // Use these instead of delay(...) in rtos tasks
 //**************************************************************************
-void myDelay(double us){
-  vTaskDelay( us / portTICK_PERIOD_US ); 
-}
-
-//**************************************************************************
-// implement tasks
-//**************************************************************************
-void TaskReadHeart(void* pvParameters){
-  const double lowerBound = 1/URL;
-  double upperBound = 1/LRL;
-  
-  char lastWave='T';
-  double beatStartTime;
-
-  Serial.println("Thread TaskReadHeart: Started");
-  while(true){
-    double currentTime = clock()/CLOCKS_PER_SEC;
-    static double lastRTime = currentTime;
-
-    // No R wave was detected until upper bound
-    if(currentTime - lastRTime >= upperBound){
-        currentPaceValue = 1;
-        Serial.println("Exceeded upper bound");
-    }
-    
-    // detect wave signal from heart
-    if(Serial1.available()>=0){  // if there is any byte available to be read on UART1 buffer
-      String signal = Serial1.readStringUntil('\n'); // read amplitude signal from RandomHeart
-      Serial.print("Signal received from heart: ");
-      Serial.println(signal);
-
-      // change data type for string operation
-      string amplitudeValue = signal.c_str(); 
-
-      if(stoi(amplitudeValue) == P_AMP && lastWave == 'T'){
-        beatStartTime = currentTime;
-        lastWave='P';
-        Serial.println("P wave detected");
-      }
-      else if(stoi(amplitudeValue) == Q_AMP && lastWave == 'P'){
-        lastWave='Q';
-        Serial.println("Q wave detected");
-      }
-      // Detecting R wave
-      else if(stoi(amplitudeValue) == R_AMP){
-        // anomalous R wave after PQRST
-        if(currentTime - beatStartTime <= 1/REFRACTORY_PERIOD){ 
-          Serial.println("ignoring anomalous R Wave");
-          continue; //ignore
-        }
-        // detected before lower
-        if(currentTime - lastRTime <= lowerBound){
-          // measure R-R interval from new wave and maintain pace=0
-          lastRTime = currentTime;
-          Serial.println("R wave detected before lower bound");
-        }
-
-        // if natural R-wave is detected : enable hysteresis pacing
-        lastPaceValue == 0 ? upperBound = 1/HRL : 1/LRL;
-        lastWave='R';
-        Serial.println("R wave detected");
-      }
-      else if(stoi(amplitudeValue) == S_AMP && lastWave == 'R'){
-        lastWave = 'S';
-        Serial.println("S wave detected");
-      } 
-      else if(stoi(amplitudeValue) == T_AMP && lastWave=='S'){
-        lastWave = 'T';
-        Serial.println("T wave detected");
-      }
-    }
-  }
-}
-
-void TaskSendPace(void* pvParameters){
-  Serial.println("Thread TaskSendPace: Started");
-  while(true){
-    // Delay for pace frequency
-    myDelay(1 / PACE_FREQUENCY);
-
-    // Send to heart
-    Serial1.println(currentPaceValue);
-
-    Serial.print("Sending pace: ");
-    Serial.println(currentPaceValue);
-
-    lastPaceValue = currentPaceValue;
-    currentPaceValue = 0;  // set to default
-  }
+void myDelayMs(int ms)
+{
+  vTaskDelay( ms / portTICK_PERIOD_MS );  
 }
 
 
@@ -142,7 +53,7 @@ void setup() {
     1, //priority
     &Handle_readTask //task handle
   );
-/*
+
   xTaskCreate(
     TaskSendPace, //task pointer
     "sendpace",  //task name-for humans
@@ -151,7 +62,7 @@ void setup() {
     2, //priority
     &Handle_sendTask //task handle
   );
-*/
+
   // Start the RTOS
   vTaskStartScheduler();
 
@@ -165,8 +76,92 @@ void setup() {
   }
 }
 
-
 void loop() {
-
 }
+
+
+//**************************************************************************
+// implement tasks
+//**************************************************************************
+void TaskReadHeart(void* pvParameters){
+  Serial.println("Thread TaskReadHeart: Started");
+
+  const double lowerBound = 1000.0*60/URL;
+  double upperBound = 1000.0*60/LRL;
+
+  char lastWave='T';
+  double beatStartTime;
+  
+  while(true){
+    unsigned long currentTime = millis(); //time in milliseconds
+    static unsigned long lastRTime = currentTime;
+    currentPaceValue = 0; // set to default
+
+    // No R wave was detected until upper bound
+    if(currentTime - lastRTime >= upperBound){
+      currentPaceValue = 1;
+    }
+
+    // detect wave signal from heart
+    if(Serial1.available()>0){  // if there is any byte available to be read on UART1 buffer
+      String signal = Serial1.readStringUntil('\n'); // read amplitude signal from RandomHeart
+        Serial.print("Signal received from heart: ");
+        Serial.println(signal);
+
+        // change data type for string operation
+        string amplitudeValue = signal.c_str(); 
+
+        // Checking which wave we got
+        if(stod(amplitudeValue) == P_AMP  && lastWave == 'T'){
+          beatStartTime = currentTime;
+          lastWave='P';
+        }
+        else if(stod(amplitudeValue) == Q_AMP && lastWave == 'P'){
+          lastWave='Q';
+        }
+        // Detecting R wave
+        else if(stod(amplitudeValue) == R_AMP){
+          // anomalous R wave after PQRST
+          if(currentTime - beatStartTime <= 1/REFRACTORY_PERIOD){ 
+            Serial.println("ignoring anomalous R Wave");
+            continue; //ignore
+          }
+          // detected before lower
+          if(currentTime - lastRTime <= lowerBound){
+            // measure R-R interval from new wave and maintain pace=0
+            Serial.println("R wave detected before lower bound");
+          }
+          
+          // if natural R-wave is detected : enable hysteresis pacing
+          lastPaceValue == 0 ? upperBound = 1000*60/HRL : 1000*60/LRL;
+          lastWave='R';
+          lastRTime = currentTime;
+        }
+        else if(stod(amplitudeValue) == S_AMP && lastWave == 'R'){
+          lastWave = 'S';
+        } 
+        else if(stod(amplitudeValue) == T_AMP && lastWave=='S'){
+          lastWave = 'T';
+        }
+    }
+  }
+}
+
+
+void TaskSendPace(void* pvParameters){
+  Serial.println("Thread TaskSendPace: Started");
+  long interval = 1000.0 / PACE_FREQUENCY;
+  
+  while(true){
+    myDelayMs(interval);
+
+    // Send pace signal to the heart
+    Serial1.println(currentPaceValue);
+    Serial.print("pace sent: ");
+    Serial.println(currentPaceValue);
+    
+    lastPaceValue = currentPaceValue;   
+  }
+}
+
 

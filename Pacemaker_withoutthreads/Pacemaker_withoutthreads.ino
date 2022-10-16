@@ -1,4 +1,3 @@
-#include <time.h>
 #include <string>
 #include "pacemaker.h"
 using namespace std;

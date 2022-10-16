@@ -1,5 +1,4 @@
 /* constants for pacemaker project */
-
 #define HEART_FREQUENCY 100
 #define PACE_FREQUENCY 50
 
@@ -10,7 +9,7 @@
 #define T_AMP 0.2
 
 #define URL 60
-#define LRL 40
-#define HRL 30
+#define LRL 50
+#define HRL 40
 
 #define REFRACTORY_PERIOD 0.5
