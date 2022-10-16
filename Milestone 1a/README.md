@@ -1,6 +1,7 @@
 Milestone 1(a)
 
 ------------------------- Instructions for running code -------------------------
+
 Wire together two Arduinos as shown in class. Preferably use two computers, as the RandomHeart and Pacemaker each print out separate information to the
 Serial Monitor, and it can be helpful to see them side by side. For each code file, just compile and upload them. The program may take a little time to start,
 but it will eventually start running.
