@@ -35,7 +35,7 @@ int        port        = 8883;
 const char willTopic[] = "arduino/will";
 const char Topic1[]   = "v1/devices/me/telemetry";
 const char Topic2[]   = "v1/gateway/attributes";
-
+const char attribute_topic[] = "v1/devices/me/attributes";
 
 //**************************************************************************
 // global variables for pacemaker operation
@@ -58,7 +58,7 @@ int URL = 60;
 int LRL = 50;
 int HRL = 40;
 
-const double REFRACTORY_PERIOD = 0.6;
+double REFRACTORY_PERIOD = 0.6;
 
 
 // Declare a semaphore with an inital counter value of zero.
@@ -254,6 +254,22 @@ static THD_FUNCTION(TaskMQTT, arg){
   
   while(true){
     chThdSleepMilliseconds(interval);
+
+    mqttClient.subscribe(attribute_topic);
+    String message = mqttClient.readString();
+
+    if (message.indexOf("LRL") != -1) {
+      LRL = (message.substring(message.length() - 3)).toInt();
+    }
+    if (message.indexOf("URL") != -1) {
+      URL = message.substring(message.length() - 3).toInt();
+    }
+    if (message.indexOf("HRL") != -1) {
+      HRL = message.substring(message.length() - 3).toInt();
+    }
+    if (message.indexOf("VRP") != -1) {
+      REFRACTORY_PERIOD = message.substring(message.length()-3).toFloat();
+    }
     
     // Send message to broker
     String payload1;
