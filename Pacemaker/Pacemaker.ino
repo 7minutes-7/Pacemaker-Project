@@ -76,8 +76,8 @@ static THD_WORKING_AREA(waThread3, 128);
 void chSetup(){
  // Start threads.
   
-  chThdCreateStatic(waThread1, sizeof(waThread1),
-    NORMALPRIO + 2, TaskSendPace, NULL);
+  //chThdCreateStatic(waThread1, sizeof(waThread1),
+   // NORMALPRIO + 2, TaskSendPace, NULL);
 /*
   chThdCreateStatic(waThread2, sizeof(waThread2),
     NORMALPRIO + 1, TaskReadHeart, NULL);
@@ -260,12 +260,18 @@ static THD_FUNCTION(TaskMQTT, arg){
 
     if (message.indexOf("LRL") != -1) {
       LRL = (message.substring(message.length() - 3)).toInt();
+      Serial1.print("LRL: ");
+      Serial1.println(LRL);
     }
     if (message.indexOf("URL") != -1) {
       URL = message.substring(message.length() - 3).toInt();
+      Serial1.print("URL: ");
+      Serial1.println(URL);
     }
     if (message.indexOf("HRL") != -1) {
       HRL = message.substring(message.length() - 3).toInt();
+      Serial1.print("HRL: ");
+      Serial1.println(HRL);
     }
     if (message.indexOf("VRP") != -1) {
       REFRACTORY_PERIOD = message.substring(message.length()-3).toFloat();
