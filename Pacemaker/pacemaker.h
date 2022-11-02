@@ -1,6 +1,7 @@
 /* constants for pacemaker project */
 #define HEART_FREQUENCY 100
 #define PACE_FREQUENCY 50
+#define PUBLISH_FREQENCY 25
 
 #define P_AMP 0.2
 #define Q_AMP -0.2
