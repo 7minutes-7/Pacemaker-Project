@@ -54,6 +54,7 @@ It interrupts "TaskReadHeart" in the frequency of the Pacemaker, allowing the pa
 
 ## Milestone 1(b)
 ------------------------- Details for Pacemaker -------------------------
+
 We had some trouble sending messages to the MQTT broker inside a task implemented with the FreeRTOS library and decided to use the TaskScheduler library instead.
 There are a total of three threads on the pacemaker. The first two "t1", "t2" being the threads implemented on Milestone 1(a) to read heartsignals and send the calculated 
 pace signals. 
