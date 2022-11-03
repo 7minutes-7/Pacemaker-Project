@@ -22,7 +22,7 @@ int num_executed = 0;
 
 int cycles = 0;
 
-double refract_period = 0.5;
+double refract_period = 0.6;
 
 int LRL = 40;
 int URL = 60;
@@ -56,11 +56,31 @@ void loop() {
   // put your main code here, to run repeatedly:
   // send info to the pacemaker every cycle, saying which stage the heart is in
   unsigned long currentMillis = millis();
+  bool remote_control = false;
+  String message = "";
+
+  if (Serial1.readStringUntil('\n').indexOf("LRL") != -1 || Serial1.readStringUntil('\n').indexOf("URL") != -1 || Serial1.readStringUntil('\n').indexOf("HRL") != -1) {
+    remote_control = true;
+    message = Serial1.readStringUntil('\n');
+  }
+
+  if (message.indexOf("LRL") != -1) {
+    LRL = message.substring(message.length() - 3).toInt();
+    upper_bound =  (1.0 / LRL) * 60 * 100;
+  }
+  if (message.indexOf("URL") != -1) {
+    URL = message.substring(message.length() - 3).toInt();
+    lower_bound = (1.0 / URL) * 60 * 100;
+  }
+  if (message.indexOf("HRL") != -1) {
+    HRL = message.substring(message.length() - 3).toInt();
+    hysteresis_bound = (1.0 / HRL) * 60 * 100;
+  }
 
   if (currentMillis - previousMillis >= interval) {
     // save the last time a message was sent
     previousMillis = currentMillis;
-    if (cycles % 2 == 0) {
+    if (cycles % 2 == 0 && !remote_control) {
       pace = Serial1.readStringUntil('\n'); 
     }
 
