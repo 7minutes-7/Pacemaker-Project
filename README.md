@@ -1,4 +1,4 @@
-## Milestone 1(a)
+## Milestone 1(a) (10/17/2022)
 
 ------------------------- Instructions for running code -------------------------
 
@@ -52,7 +52,7 @@ pace values from them, while Thread "TaskSendPace" sends the calculated pace val
 It interrupts "TaskReadHeart" in the frequency of the Pacemaker, allowing the paces to be sent in a regular manner.
 
 
-## Milestone 1(b)
+## Milestone 1(b) (11/04/2022)
 ------------------------- Details for Pacemaker -------------------------
 
 We had some trouble sending messages to the MQTT broker inside a task implemented with the FreeRTOS library and decided to use the TaskScheduler library instead.
