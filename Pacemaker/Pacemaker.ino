@@ -45,7 +45,7 @@ double currentHeartSignal = 0.0;
 /* constants for pacemaker project */
 const int HEART_FREQUENCY = 100;
 const int PACE_FREQUENCY = 50;
-const int PUBLISH_FREQUENCY = 100;
+const int PUBLISH_FREQUENCY = 50;
 
 const double P_AMP = 0.2;
 const double Q_AMP = -0.2;
@@ -136,24 +136,28 @@ void loop() {
 //**************************************************************************
 // implement tasks
 //**************************************************************************
-void TaskReadHeart(){
-  const double lowerBound = 1000.0*60/URL;
-  static double upperBound = 1000.0*60/LRL;
+double lowerBound = 1000.0*60/URL;
+double upperBound = 1000.0*60/LRL;
 
-  static char lastWave='T';
-  static double beatStartTime;
+char lastWave='T';
+double beatStartTime;
 
-  static bool isNatural = true;
+bool isNatural = true;
   
-  unsigned long currentTime = millis(); //time in milliseconds
-  static unsigned long lastRTime = currentTime;
- 
+unsigned long currentTime = millis(); //time in milliseconds
+unsigned long lastRTime = currentTime;
+
+void TaskReadHeart(){
+
+  currentTime = millis();
   // No R wave was detected until upper bound
   if(currentTime - lastRTime >= upperBound && lastWave == 'T'){
     currentPaceValue = 1;
     isNatural = false;  // this is not a natural wave!!
   } 
   else {
+    Serial.println(currentTime-lastRTime);
+    Serial.println(lastWave);
     currentPaceValue = 0;
   }
   // detect wave signal from heart
@@ -228,17 +232,21 @@ void TaskMQTT(){
     LRL = (message.substring(message.length() - 3)).toInt();
     Serial1.print("LRL: ");
     Serial1.println(LRL);
+    lowerBound = 1000.0*60/URL;
+    upperBound = 1000.0*60/LRL;
   }
   if (message.indexOf("URL") != -1) {
     URL = message.substring(message.length() - 3).toInt();
     Serial1.print("URL: ");
     Serial1.println(URL);
+    lowerBound = 1000.0*60/URL;
+    upperBound = 1000.0*60/LRL;
   }
   if (message.indexOf("HRL") != -1) {
     HRL = message.substring(message.length() - 3).toInt();
     Serial1.print("HRL: ");
     Serial1.println(HRL);
-    }
+  }
   if (message.indexOf("VRP") != -1) {
     REFRACTORY_PERIOD = message.substring(message.length()-3).toFloat();
   } 
