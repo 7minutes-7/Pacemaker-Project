@@ -1,4 +1,9 @@
-#include "ChRt.h"
+#define _TASK_SLEEP_ON_IDLE_RUN
+#define _TASK_PRIORITY
+#define _TASK_WDT_IDS
+#define _TASK_TIMECRITICAL
+#include <TaskScheduler.h>
+
 #include <ArduinoJson.h>
 #include <ArduinoJson.hpp>
 #include <string>
@@ -21,12 +26,6 @@ using namespace std;
 char ssid[] = SECRET_SSID;    // your network SSID (name)
 char pass[] = SECRET_PASS;    // your network password (use for WPA, or use as key for WEP)
 
-// To connect with SSL/TLS:
-// 1) Change WiFiClient to WiFiSSLClient.
-// 2) Change port value from 1883 to 8883.
-// 3) Change broker value to a server with a known SSL/TLS root certificate 
-//    flashed in the WiFi module.
-
 WiFiSSLClient wifiClient;
 MqttClient mqttClient(wifiClient);
 
@@ -41,7 +40,7 @@ const char Topic2[]   = "v1/gateway/attributes";
 // global variables for pacemaker operation
 //**************************************************************************  
 int currentPaceValue = 0;
-string currentHeartSignal;
+double currentHeartSignal = 0.0;
 
 /* constants for pacemaker project */
 const int HEART_FREQUENCY = 100;
@@ -60,31 +59,21 @@ int HRL = 40;
 
 const double REFRACTORY_PERIOD = 0.6;
 
-
-// Declare a semaphore with an inital counter value of zero.
-SEMAPHORE_DECL(sem, 0);
-
 //**************************************************************************
 // global variables for RTOS
 //**************************************************************************
-static THD_WORKING_AREA(waThread1, 128);
-static THD_WORKING_AREA(waThread2, 128);
-static THD_WORKING_AREA(waThread3, 128);
+Scheduler r1, r2, r3; // schedulers in increasing priority
 
-//------------------------------------------------------------------------------
-// continue setup() after chBegin().
-void chSetup(){
- // Start threads.
-  
-  chThdCreateStatic(waThread1, sizeof(waThread1),
-    NORMALPRIO + 2, TaskSendPace, NULL);
-/*
-  chThdCreateStatic(waThread2, sizeof(waThread2),
-    NORMALPRIO + 1, TaskReadHeart, NULL);
-*/
-  chThdCreateStatic(waThread3, sizeof(waThread3),
-    NORMALPRIO + 1, TaskMQTT, NULL);
-}
+void TaskReadHeart();
+void TaskSendPace();
+void TaskMQTT();
+
+Task t1(1000/HEART_FREQUENCY, TASK_FOREVER, &TaskReadHeart, &r1);
+Task t2(1000/PACE_FREQUENCY, TASK_FOREVER, &TaskSendPace, &r2);
+Task t3(1000/PUBLISH_FREQUENCY, TASK_FOREVER, &TaskMQTT, &r3);
+
+
+
 
 void setup() {
   Serial.begin(9600);
@@ -106,10 +95,6 @@ void setup() {
   }
 
   Serial.println("You're connected to the network");
-
-  // You can provide a unique client ID, if not set the library uses Arduino-millis()
-  // Each client must have a unique client ID
-  // mqttClient.setId("clientId");
 
   // You can provide a username and password for authentication
   mqttClient.setUsernamePassword("MDzmeB6mOLuj0G0lGDZl", "");
@@ -141,141 +126,122 @@ void setup() {
   Serial.println("You're connected to the MQTT broker!");
   Serial.println();
 
-  // Initialize OS and then call chSetup.
-  chBegin(chSetup);
-  // chBegin() resets stacks and should never return
-  while(true){}
+  r1.setHighPriorityScheduler(&r2);
+  r2.setHighPriorityScheduler(&r3);
+  r1.enableAll(true); // this will recursively enable the higher priority tasks as well
 }
 
 void loop() {
+  r1.execute();
 }
 
 
 //**************************************************************************
 // implement tasks
 //**************************************************************************
-static THD_FUNCTION(TaskReadHeart, arg){
+void TaskReadHeart(){
   const double lowerBound = 1000.0*60/URL;
-  double upperBound = 1000.0*60/LRL;
+  static double upperBound = 1000.0*60/LRL;
 
-  char lastWave='T';
-  double beatStartTime;
+  static char lastWave='T';
+  static double beatStartTime;
 
-  bool isNatural = true;
+  static bool isNatural = true;
   
-  while(true){
-    chThdYield();
-    unsigned long currentTime = millis(); //time in milliseconds
-    static unsigned long lastRTime = currentTime;
+  unsigned long currentTime = millis(); //time in milliseconds
+  static unsigned long lastRTime = currentTime;
  
-    // No R wave was detected until upper bound
-    if(currentTime - lastRTime >= upperBound && lastWave == 'T'){
-      currentPaceValue = 1;
-      isNatural = false;  // this is not a natural wave!!
+  // No R wave was detected until upper bound
+  if(currentTime - lastRTime >= upperBound && lastWave == 'T'){
+    currentPaceValue = 1;
+    isNatural = false;  // this is not a natural wave!!
+  } 
+  else {
+    currentPaceValue = 0;
+  }
+  // detect wave signal from heart
+  if(Serial1.available()>0){  // if there is any byte available to be read on UART1 buffer
+    String signal = Serial1.readStringUntil('\n'); // read amplitude signal from RandomHeart
+    Serial.print("Signal received from heart: ");
+    Serial.println(signal);
+
+    // change data type from String to double
+    double amplitudeValue = stod(signal.c_str()); 
+    currentHeartSignal = amplitudeValue;
+
+    // Checking which wave we got
+    if(amplitudeValue == P_AMP  && (lastWave == 'T' || lastWave == 'R')){
+      beatStartTime = currentTime;
+      lastWave='P';
+    }
+    else if(amplitudeValue == Q_AMP && lastWave == 'P'){
+      lastWave='Q';
+    }
+    // Detecting R wave
+    else if(amplitudeValue == R_AMP){
+      // anomalous R wave after PQRST
+      if(currentTime - beatStartTime <= 1000.0 * REFRACTORY_PERIOD && lastWave == 'T'){ 
+        Serial.print("ignoring anomalous R Wave: ");
+        Serial.println(1);
+        return; //ignore
+      }
+          
+      // detected before lower
+      if(currentTime - lastRTime <= lowerBound && lastWave == 'Q'){
+        // measure R-R interval from new wave and maintain pace=0
+        Serial.print("R wave detected before lower bound: ");
+        Serial.println(1);
+      }
+          
+      // if natural R-wave is detected : enable hysteresis pacing
+      if(isNatural){
+        Serial.println("natural r-wave detected");
+        upperBound = 1000*60/HRL;
+      }
+      else{
+        Serial.println("paced r-wave detected");
+        upperBound = 1000*60/LRL;
+        isNatural = true;
+      }
+
+      lastWave='R';
+      lastRTime = currentTime;
+    }
+    else if(amplitudeValue == S_AMP && lastWave == 'R'){
+      lastWave = 'S';
     } 
-    else {
-      currentPaceValue = 0;
-    }
-
-    // detect wave signal from heart
-    if(Serial1.available()>0){  // if there is any byte available to be read on UART1 buffer
-      String signal = Serial1.readStringUntil('\n'); // read amplitude signal from RandomHeart
-        Serial.print("Signal received from heart: ");
-        Serial.println(signal);
-        currentHeartSignal = signal.c_str();
-
-        // change data type from String to double
-        double amplitudeValue = stod(currentHeartSignal); 
-
-        // Checking which wave we got
-        if(amplitudeValue == P_AMP  && (lastWave == 'T' || lastWave == 'R')){
-          beatStartTime = currentTime;
-          lastWave='P';
-        }
-        else if(amplitudeValue == Q_AMP && lastWave == 'P'){
-          lastWave='Q';
-        }
-        // Detecting R wave
-        else if(amplitudeValue == R_AMP){
-          // anomalous R wave after PQRST
-          if(currentTime - beatStartTime <= 1000.0 * REFRACTORY_PERIOD && lastWave == 'T'){ 
-            Serial.print("ignoring anomalous R Wave: ");
-            Serial.println(1);
-            continue; //ignore
-          }
-          
-          // detected before lower
-          if(currentTime - lastRTime <= lowerBound && lastWave == 'Q'){
-            // measure R-R interval from new wave and maintain pace=0
-            Serial.print("R wave detected before lower bound: ");
-            Serial.println(1);
-          }
-          
-          // if natural R-wave is detected : enable hysteresis pacing
-          if(isNatural){
-            Serial.println("natural r-wave detected");
-            upperBound = 1000*60/HRL;
-          }
-          else{
-            Serial.println("paced r-wave detected");
-            upperBound = 1000*60/LRL;
-            isNatural = true;
-          }
-
-          lastWave='R';
-          lastRTime = currentTime;
-        }
-        else if(amplitudeValue == S_AMP && lastWave == 'R'){
-          lastWave = 'S';
-        } 
-        else if(amplitudeValue == T_AMP && lastWave=='S'){
-          lastWave = 'T';
-        }
+    else if(amplitudeValue == T_AMP && lastWave=='S'){
+      lastWave = 'T';
     }
   }
 }
 
-static THD_FUNCTION(TaskSendPace, arg){
-  long interval = 1000.0 / PACE_FREQUENCY;
-  
-  while(true){
-    chThdSleepMilliseconds(interval);
-
-    // Send pace signal to the heart
-    Serial1.println(currentPaceValue);
-    Serial.print("pace sent: ");
-    Serial.println(currentPaceValue);
-  }
+void TaskSendPace(){
+  // Send pace signal to the heart
+  Serial1.println(currentPaceValue);
+  Serial.print("pace sent: ");
+  Serial.println(currentPaceValue);
 }
 
-static THD_FUNCTION(TaskMQTT, arg){
+void TaskMQTT(){
   long interval = 1000.0 / PUBLISH_FREQUENCY;
-  Serial.println("TaskMQTT thread");
-  
-  while(true){
-    chThdSleepMilliseconds(interval);
-    
-    // Send message to broker
-    String payload1;
-    DynamicJsonDocument doc1(1024);
-    doc1["HS"] = currentHeartSignal;
-    doc1["PS"] = String(currentPaceValue);
-    serializeJson(doc1, payload1);  
 
-    bool retained = false;
-    int qos = 1;
-    bool dup = false;
+  // Send message to broker
+  String payload1;
+  DynamicJsonDocument doc1(1024);
+  doc1["HS"] = currentHeartSignal;
+  doc1["PS"] = currentPaceValue;
+  serializeJson(doc1, payload1);  
 
-    Serial.print("Try to send message: ");
-    Serial.println(payload1);
-    
-    Serial.println(mqttClient.connected());
-    mqttClient.beginMessage(Topic1, payload1.length(), retained, qos, dup);
-    mqttClient.print(payload1);
-    mqttClient.endMessage();
+  bool retained = false;
+  int qos = 1;
+  bool dup = false;
 
-    Serial.print("Message sent: ");
-    Serial.println(payload1);
-  }
+  mqttClient.beginMessage(Topic1, payload1.length(), retained, qos, dup);
+  mqttClient.print(payload1);
+  mqttClient.endMessage();
+
+  Serial.print("Message sent: ");
+  Serial.println(payload1);
 }
 
