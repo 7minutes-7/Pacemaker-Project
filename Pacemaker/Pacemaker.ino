@@ -72,26 +72,6 @@ Task t1(1000/HEART_FREQUENCY, TASK_FOREVER, &TaskReadHeart, &r1);
 Task t2(1000/PACE_FREQUENCY, TASK_FOREVER, &TaskSendPace, &r2);
 Task t3(1000/PUBLISH_FREQUENCY, TASK_FOREVER, &TaskMQTT, &r3);
 
-
-
-<<<<<<< HEAD
-=======
-//------------------------------------------------------------------------------
-// continue setup() after chBegin().
-void chSetup(){
- // Start threads.
-  
-  //chThdCreateStatic(waThread1, sizeof(waThread1),
-   // NORMALPRIO + 2, TaskSendPace, NULL);
-/*
-  chThdCreateStatic(waThread2, sizeof(waThread2),
-    NORMALPRIO + 1, TaskReadHeart, NULL);
-*/
-  chThdCreateStatic(waThread3, sizeof(waThread3),
-    NORMALPRIO + 1, TaskMQTT, NULL);
-}
->>>>>>> a85b0d4eb8230d908e8a1ea17084d16e0ced4da4
-
 void setup() {
   Serial.begin(9600);
   Serial1.begin(9600);  // initialize UART with baud rate of 9600
@@ -241,43 +221,28 @@ void TaskSendPace(){
 }
 
 void TaskMQTT(){
-  long interval = 1000.0 / PUBLISH_FREQUENCY;
-<<<<<<< HEAD
-=======
-  Serial.println("TaskMQTT thread");
+  mqttClient.subscribe(attribute_topic);
+  String message = mqttClient.readString();
+
+  if (message.indexOf("LRL") != -1) {
+    LRL = (message.substring(message.length() - 3)).toInt();
+    Serial1.print("LRL: ");
+    Serial1.println(LRL);
+  }
+  if (message.indexOf("URL") != -1) {
+    URL = message.substring(message.length() - 3).toInt();
+    Serial1.print("URL: ");
+    Serial1.println(URL);
+  }
+  if (message.indexOf("HRL") != -1) {
+    HRL = message.substring(message.length() - 3).toInt();
+    Serial1.print("HRL: ");
+    Serial1.println(HRL);
+    }
+  if (message.indexOf("VRP") != -1) {
+    REFRACTORY_PERIOD = message.substring(message.length()-3).toFloat();
+  } 
   
-  while(true){
-    chThdSleepMilliseconds(interval);
-
-    mqttClient.subscribe(attribute_topic);
-    String message = mqttClient.readString();
-
-    if (message.indexOf("LRL") != -1) {
-      LRL = (message.substring(message.length() - 3)).toInt();
-      Serial1.print("LRL: ");
-      Serial1.println(LRL);
-    }
-    if (message.indexOf("URL") != -1) {
-      URL = message.substring(message.length() - 3).toInt();
-      Serial1.print("URL: ");
-      Serial1.println(URL);
-    }
-    if (message.indexOf("HRL") != -1) {
-      HRL = message.substring(message.length() - 3).toInt();
-      Serial1.print("HRL: ");
-      Serial1.println(HRL);
-    }
-    if (message.indexOf("VRP") != -1) {
-      REFRACTORY_PERIOD = message.substring(message.length()-3).toFloat();
-    }
-    
-    // Send message to broker
-    String payload1;
-    DynamicJsonDocument doc1(1024);
-    doc1["HS"] = currentHeartSignal;
-    doc1["PS"] = String(currentPaceValue);
-    serializeJson(doc1, payload1);  
-
   // Send message to broker
   String payload1;
   DynamicJsonDocument doc1(1024);
