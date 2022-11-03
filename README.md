@@ -1,4 +1,4 @@
-Milestone 1(a)
+## Milestone 1(a)
 
 ------------------------- Instructions for running code -------------------------
 
@@ -50,3 +50,16 @@ the period for R sensing.
 The functionality of the Pacemaker is split into two threads using the FreeRTOS library. Thread "TaskReadHeart" reads voltage signals from the heart and calculates 
 pace values from them, while Thread "TaskSendPace" sends the calculated pace value to the RandomHeart. "TaskSendPace" has a higher priority over "TaskReadHeart".
 It interrupts "TaskReadHeart" in the frequency of the Pacemaker, allowing the paces to be sent in a regular manner.
+
+
+## Milestone 1(b)
+------------------------- Details for Pacemaker -------------------------
+We had some trouble sending messages to the MQTT broker inside a task implemented with the FreeRTOS library and decided to use the TaskScheduler library instead.
+There are a total of three threads on the pacemaker. The first two "t1", "t2" being the threads implemented on Milestone 1(a) to read heartsignals and send the calculated 
+pace signals. 
+/* explanation about message receiving should be added */ 
+The new third thread "t3" communicates with the MQTT broker. It creates a JSON string with the current heartbeat and pace signal value and sends it to the broker in  
+the topic "v1/devices/me/telemetry".
+The three threads are scheduled in a priority order of "t3" > "t2" > "t1".  
+
+
